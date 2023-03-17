@@ -1,5 +1,5 @@
 {
-  "name": "",
+  "name": "cdr",
   "type": "module",
   "version": "0.0.1",
   "scripts": {
@@ -10,6 +10,7 @@
     "astro": "astro"
   },
   "dependencies": {
-    "astro": "^2.0.18"
+    "astro": "^2.0.18",
+    "force-graph": "^1.43.0"
   }
 }
