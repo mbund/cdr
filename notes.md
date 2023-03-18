@@ -3,7 +3,7 @@ While SSO'd through buckeyelink/Schedule Planner:
 - All Terms
   - https://ohiostate.collegescheduler.com/api/terms
 - Course Attributes
-  - https://ohiostate.collegescheduler.com/api/terms/Summer%202023%20Term/courseattributes
+  - https://ohiostate.collegescheduler.com/api/terms/Autumn%202023%20Semester/courseattributes
 - All Courses
   - https://ohiostate.collegescheduler.com/api/terms/Autumn%202023%20Semester/courses
 - CSE Courses
