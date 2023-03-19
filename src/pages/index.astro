@@ -14,6 +14,9 @@
     <script>
       import ForceGraph from "force-graph";
 
+      const dashLen = 6;
+      const gapLen = 2;
+
       fetch("/courses.json")
         .then((res) => res.json())
         .then((data) => {
@@ -24,9 +27,11 @@
             .graphData(data)
             .nodeId("id")
             .nodeVal("val")
-            .nodeLabel("id")
+            .nodeLabel("label")
             .nodeAutoColorBy("group")
             .linkSource("source")
+            .linkLineDash((link) => (link as any).dashed && [dashLen, gapLen])
+            .linkDirectionalArrowLength(5)
             .linkTarget("target");
         });
     </script>

@@ -31,10 +31,3 @@ for (const course of rawCourses) {
 
   await new Promise((resolve) => setTimeout(resolve, 500));
 }
-
-// console.log(courses);
-// // console.log(await Promise.all(courses));
-// for (const course of courses) {
-//   console.log(await course);
-//   await new Promise((resolve) => setTimeout(resolve, 2000));
-// }
