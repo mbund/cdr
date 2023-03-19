@@ -1,14 +1,14 @@
 OSU course dependency visualizer
 
-## Maintaining
-
 ### Running
 
 ```
 pnpm astro dev
 ```
 
-### Fetch the latest data from the OSU course catalog
+### Maintaining
+
+#### Fetch the latest data from the OSU course catalog
 
 1. In a browser sign in to [buckeyelink](https://buckeyelink.osu.edu)
 2. Navigate to Schedule Planner
