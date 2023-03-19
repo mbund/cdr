@@ -17,7 +17,7 @@
       const dashLen = 6;
       const gapLen = 2;
 
-      fetch("/courses.json")
+      fetch("courses.json")
         .then((res) => res.json())
         .then((data) => {
           const graphElement = document.getElementById("graph");
