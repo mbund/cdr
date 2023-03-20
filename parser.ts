@@ -369,13 +369,11 @@ const unreachable = (): never => {
 };
 
 const baseCallNumber = (callNumber: string): string | null => {
-  //   const numberMatch = callNumber.match(/\d+/);
-  //   const numberString = numberMatch![0];
-  //   if (numberString.length === 3) return null;
+  const numberMatch = callNumber.match(/\d+/);
+  const numberString = numberMatch![0];
+  if (numberString.length === 3) return null;
 
-  //   return numberString + (callNumber[callNumber.length - 1] === "h" ? "h" : "");
-
-  return callNumber;
+  return numberString + (callNumber[callNumber.length - 1] === "h" ? "h" : "");
 };
 
 const prettyPrint = (expression: Expression | null): string => {
@@ -417,9 +415,15 @@ const prettyPrint = (expression: Expression | null): string => {
 // console.log("Prereqs: ", prettyPrint(parsed.prereq));
 // console.log("Concur: ", prettyPrint(parsed.concur));
 
-const nodes = courses.map((course) => ({
+const coursesFiltered = courses.filter(
+  (course) => course.subjectId !== "MUSIC"
+  // ["CSE", "MATH", "PHYSICS", "STAT"].includes(course.subjectId)
+);
+
+const nodes = coursesFiltered.map((course) => ({
   label: `${course.subjectId} ${course.callNumber}`,
-  id: `${course.subjectId} ${baseCallNumber(course.callNumber)}`,
+  id: `${course.subjectId} ${course.callNumber}`,
+  hover: `${course.title}. ${course.description}`,
   group: course.subjectId,
 }));
 
@@ -431,24 +435,27 @@ type Link = {
 
 const graph = {
   nodes: nodes,
-  links: courses.flatMap((course) => {
+  links: coursesFiltered.flatMap((course) => {
     console.log(`${course.subjectId} ${course.callNumber}`);
     const parsed = parse(course.description, course.subjectId);
 
     const extract = (expression: Expression): Link[] => {
       if (expression.type === "literal") {
-        const target = `${expression.subjectId.toUpperCase()} ${baseCallNumber(
-          expression.callNumber
-        )}`;
-        if (!nodes.find((node) => node.id === target)) return [];
+        const targetCourses = coursesFiltered.filter(
+          (c) =>
+            c.subjectId == expression.subjectId.toUpperCase() &&
+            (baseCallNumber(expression.callNumber) == expression.callNumber
+              ? baseCallNumber(c.callNumber) == expression.callNumber
+              : c.callNumber == expression.callNumber)
+        );
 
-        return [
+        return targetCourses.flatMap((c) => [
           {
-            source: target,
-            target: `${course.subjectId} ${baseCallNumber(course.callNumber)}`,
+            source: `${c.subjectId} ${c.callNumber}`,
+            target: `${course.subjectId} ${course.callNumber}`,
             dashed: false,
           },
-        ];
+        ]);
       }
 
       if (expression.type === "operator") {

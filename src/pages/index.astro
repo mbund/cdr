@@ -3,12 +3,16 @@
 
 <html lang="en">
   <head>
-    <meta charset="utf-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width" />
     <title>OSU Course Dependency Visualizer</title>
   </head>
   <body>
+    <style is:global>
+      .force-graph-container .graph-tooltip {
+        width: 60ch;
+      }
+    </style>
+
     <div id="graph"></div>
 
     <script>
@@ -26,13 +30,50 @@
           ForceGraph()(graphElement)
             .graphData(data)
             .nodeId("id")
-            .nodeVal("val")
-            .nodeLabel("label")
+            .nodeLabel("hover")
             .nodeAutoColorBy("group")
             .linkSource("source")
+            .linkTarget("target")
             .linkLineDash((link) => (link as any).dashed && [dashLen, gapLen])
-            .linkDirectionalArrowLength(5)
-            .linkTarget("target");
+            .linkDirectionalArrowLength(3)
+            .linkDirectionalArrowRelPos(0.05)
+            .linkDirectionalParticles(2)
+            .onNodeHover((node) => {
+              graphElement.style.cursor = node ? "pointer" : null;
+            })
+            .nodeCanvasObject((node, ctx) => {
+              const label = node.label;
+              const fontSize = 3;
+              ctx.font = `${fontSize}px Sans-Serif`;
+              const textWidth = ctx.measureText(label).width;
+              const bckgDimensions = [textWidth, fontSize].map(
+                (n) => n + fontSize * 0.2
+              );
+
+              ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+              ctx.fillRect(
+                node.x - bckgDimensions[0] / 2,
+                node.y - bckgDimensions[1] / 2,
+                ...bckgDimensions
+              );
+
+              ctx.textAlign = "center";
+              ctx.textBaseline = "middle";
+              ctx.fillStyle = node.color;
+              ctx.fillText(label, node.x, node.y);
+
+              node.__bckgDimensions = bckgDimensions;
+            })
+            .nodePointerAreaPaint((node, color, ctx) => {
+              ctx.fillStyle = color;
+              const bckgDimensions = node.__bckgDimensions;
+              bckgDimensions &&
+                ctx.fillRect(
+                  node.x - bckgDimensions[0] / 2,
+                  node.y - bckgDimensions[1] / 2,
+                  ...bckgDimensions
+                );
+            });
         });
     </script>
   </body>
