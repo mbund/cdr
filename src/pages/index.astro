@@ -16,10 +16,11 @@
     <div id="graph"></div>
 
     <script>
+      // force-graph types are not great (javascript library) so there are a lot of anys :(
       import ForceGraph from "force-graph";
 
-      const dashLen = 6;
-      const gapLen = 2;
+      const dashLen = 2;
+      const gapLen = 1;
 
       fetch("courses.json")
         .then((res) => res.json())
@@ -34,14 +35,19 @@
             .nodeAutoColorBy("group")
             .linkSource("source")
             .linkTarget("target")
-            .linkLineDash((link) => (link as any).dashed && [dashLen, gapLen])
-            .linkDirectionalArrowLength(3)
-            .linkDirectionalArrowRelPos(0.05)
+            .linkLineDash(
+              (link) => (link as any).concurrent && [dashLen, gapLen]
+            )
+            .linkAutoColorBy("group")
+            .linkDirectionalArrowLength((node: any) =>
+              node.concurrent ? 0 : 3
+            )
             .linkDirectionalParticles(2)
-            .onNodeHover((node) => {
-              graphElement.style.cursor = node ? "pointer" : null;
+            .onNodeHover((node: any) => {
+              graphElement.style.cursor = node ? "pointer" : "";
             })
-            .nodeCanvasObject((node, ctx) => {
+            .linkDirectionalArrowRelPos(0.05)
+            .nodeCanvasObject((node: any, ctx) => {
               const label = node.label;
               const fontSize = 3;
               ctx.font = `${fontSize}px Sans-Serif`;
@@ -54,7 +60,8 @@
               ctx.fillRect(
                 node.x - bckgDimensions[0] / 2,
                 node.y - bckgDimensions[1] / 2,
-                ...bckgDimensions
+                bckgDimensions[0],
+                bckgDimensions[1]
               );
 
               ctx.textAlign = "center";
@@ -64,14 +71,15 @@
 
               node.__bckgDimensions = bckgDimensions;
             })
-            .nodePointerAreaPaint((node, color, ctx) => {
+            .nodePointerAreaPaint((node: any, color, ctx) => {
               ctx.fillStyle = color;
               const bckgDimensions = node.__bckgDimensions;
               bckgDimensions &&
                 ctx.fillRect(
                   node.x - bckgDimensions[0] / 2,
                   node.y - bckgDimensions[1] / 2,
-                  ...bckgDimensions
+                  bckgDimensions[0],
+                  bckgDimensions[1]
                 );
             });
         });

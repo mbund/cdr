@@ -334,6 +334,7 @@ class Parser {
     while (!this.allow(["prereq", "concur", "eof"])) {
       this.consume();
     }
+
     while (this.allow(["prereq", "concur"])) {
       let mode: "p" | "c";
       if (this.accept("prereq")) {
@@ -353,7 +354,12 @@ class Parser {
       } else {
         concur = e;
       }
+
+      while (!this.allow(["prereq", "concur", "eof"])) {
+        this.consume();
+      }
     }
+
     return { prereq, concur };
   }
 }
@@ -368,12 +374,33 @@ const unreachable = (): never => {
   throw "Unreachable!";
 };
 
-const baseCallNumber = (callNumber: string): string | null => {
-  const numberMatch = callNumber.match(/\d+/);
-  const numberString = numberMatch![0];
-  if (numberString.length === 3) return null;
+const parseCallNumber = (
+  callNumber: string
+): {
+  baseCallNumber: string;
+  honors: boolean;
+  section: string | null;
+} | null => {
+  const baseCallNumber = callNumber.match(/^\d{3,4}/i)?.[0];
+  if (!baseCallNumber) return null;
 
-  return numberString + (callNumber[callNumber.length - 1] === "h" ? "h" : "");
+  const honors =
+    callNumber.toLowerCase().includes("h") ||
+    callNumber.toLowerCase().includes("e");
+
+  let section: string | null = null;
+  if (callNumber.includes(".")) {
+    let sectionMatch = callNumber.match(/(?<=\.)[\dX]+/)?.[0];
+    if (sectionMatch) {
+      section = sectionMatch;
+    }
+  }
+
+  return {
+    baseCallNumber,
+    honors,
+    section,
+  };
 };
 
 const prettyPrint = (expression: Expression | null): string => {
@@ -382,11 +409,12 @@ const prettyPrint = (expression: Expression | null): string => {
   }
 
   if (expression.type === "literal") {
-    return `${expression.subjectId.toUpperCase()} ${expression.callNumber}`;
+    return `${expression.subjectId.toUpperCase()} ${expression.callNumber.toUpperCase()}`;
   }
 
   if (expression.type === "error") {
-    return `{${expression.message}}`;
+    // return `{${expression.message}}`;
+    return "unknown";
   }
 
   if (expression.type === "operator") {
@@ -398,39 +426,32 @@ const prettyPrint = (expression: Expression | null): string => {
   return unreachable();
 };
 
-// CSE Prereq: 2231, 2321, and Stat 3460 or 3470, and enrollment in CSE, CIS, ECE, Data Analytics, or Math major, or CIS minor. Concur: Math 3345. Not open to students with credit for 5331.
-// COMPSTD Prereq: English 1110 (110), or equiv. Not open to students with credit for 2341 (272). GE cultures and ideas and diversity global studies course. GE foundation historical and cultural studies course.
-// CSE Prereq: 2122, 2123, or 2231; and 2321 or Math 2566; and enrollment in CSE, CIS, Data Analytics, Music (BS), Eng Physics, or Math major.
-// BIOLOGY Prereq or concur: Chem 1110 or 1210. Not open to students with credit for 1113 or 1114, or majoring in the Biological Sciences. GE nat sci bio course. GE foundation natural sci course.
-// CSE Prereq: Not open to students with credit for 1112 (105), 1113 (101), or 200. GE quant reason math and logical anly course. GE foundation math and quant reasoning or data anyl course.
-// BIOLOGY Prereq: Math 1120, 1130, 1148, 1150, or above, or Math Placement Level L or M. Prereq or concur: Chem 1110, 1210, 1610, or 1910H, or permission of course coordinator. Not open to students with credit for 1113 or 1113.02. This course is available for EM credit. GE nat sci bio course. GE foundation natural sci course.
-// BIOMEDE Prereq: 2000, Engr 1182 or 1282, MechEng 2040, Math 2174, and Biology 1113 or equiv, and enrollment in BiomedE major.
-// MATH Prereq: A grade of C- or above in 1114 (114), 1151, 1156, 1161.xx, 152.xx, 161.xx, or 161.01H. Not open to students with credit for 1172, 1181H or any Math class numbered 1500 or above, or with credit for 153.xx, or Math courses numbered 162.xx or above. This course is available for EM credit. GE quant reason math and logical anly course. GE foundation math and quant reasoning or data anyl course.
-// PHYSICS Intermediate level introduction to electronic circuits, devices, and instrumentation with emphasis on laboratory experience.Prereq: 1251, 1251H, 1261, or 1271.
-// PHYSICS Prereq: Honors standing, Math 2174, 2415 (415), 2255 (255), or 5520H (521H), and a grade of C+ or above in Physics 2301 (263); or permission of instructor. Not open to students with credit for 5400, 555, or 656.
-
-// const text = "";
-// const parsed = parse(text, "physics");
-// console.log(text);
-// console.log("Prereqs: ", prettyPrint(parsed.prereq));
-// console.log("Concur: ", prettyPrint(parsed.concur));
-
 const coursesFiltered = courses.filter(
-  (course) => course.subjectId !== "MUSIC"
-  // ["CSE", "MATH", "PHYSICS", "STAT"].includes(course.subjectId)
+  (course) => true
+  // course.subjectId !== "MUSIC"
+  // ["HISTORY", "ENGLISH", "KOREAN"].includes(course.subjectId)
 );
 
-const nodes = coursesFiltered.map((course) => ({
-  label: `${course.subjectId} ${course.callNumber}`,
-  id: `${course.subjectId} ${course.callNumber}`,
-  hover: `${course.title}. ${course.description}`,
-  group: course.subjectId,
-}));
+const nodes = coursesFiltered.map((course) => {
+  const parsed = parse(course.description, course.subjectId);
+
+  return {
+    label: `${course.subjectId} ${course.callNumber}`,
+    id: `${course.subjectId} ${course.callNumber}`,
+    hover: `${course.subjectId} ${course.callNumber}<br>${
+      course.title
+    }<br><br>${course.description}<br><br>Prereqs: ${prettyPrint(
+      parsed.prereq
+    )}<br>Concur: ${prettyPrint(parsed.concur)}`,
+    group: course.subjectId,
+  };
+});
 
 type Link = {
   source: string;
   target: string;
-  dashed: boolean;
+  concurrent: boolean;
+  group: string;
 };
 
 const graph = {
@@ -439,34 +460,61 @@ const graph = {
     console.log(`${course.subjectId} ${course.callNumber}`);
     const parsed = parse(course.description, course.subjectId);
 
-    const extract = (expression: Expression): Link[] => {
+    const extract = (
+      expression: Expression,
+      concurrent: boolean,
+      group: string
+    ): Link[] => {
       if (expression.type === "literal") {
-        const targetCourses = coursesFiltered.filter(
-          (c) =>
-            c.subjectId == expression.subjectId.toUpperCase() &&
-            (baseCallNumber(expression.callNumber) == expression.callNumber
-              ? baseCallNumber(c.callNumber) == expression.callNumber
-              : c.callNumber == expression.callNumber)
-        );
+        const targetCourses = coursesFiltered.filter((c) => {
+          if (c.subjectId !== expression.subjectId.toUpperCase()) return false;
+
+          const targetCallNumber = parseCallNumber(expression.callNumber);
+          const sourceCallNumber = parseCallNumber(c.callNumber);
+
+          if (!targetCallNumber || !sourceCallNumber) return false;
+
+          if (targetCallNumber.honors !== sourceCallNumber.honors) return false;
+
+          if (
+            targetCallNumber.baseCallNumber !== sourceCallNumber.baseCallNumber
+          )
+            return false;
+
+          if (targetCallNumber.section && sourceCallNumber.section)
+            return targetCallNumber.section === sourceCallNumber.section;
+
+          if (!targetCallNumber.section || targetCallNumber.section === "XX") {
+            return (
+              targetCallNumber.baseCallNumber ===
+              sourceCallNumber.baseCallNumber
+            );
+          }
+
+          return false;
+        });
 
         return targetCourses.flatMap((c) => [
           {
             source: `${c.subjectId} ${c.callNumber}`,
             target: `${course.subjectId} ${course.callNumber}`,
-            dashed: false,
+            concurrent: concurrent,
+            group: group,
           },
         ]);
       }
 
       if (expression.type === "operator") {
-        return expression.values.flatMap((value) => extract(value));
+        return expression.values.flatMap((value) =>
+          extract(value, concurrent, prettyPrint(expression))
+        );
       }
 
       return [];
     };
 
-    const prereqs = parsed.prereq ? extract(parsed.prereq) : [];
-    const concur = parsed.concur ? extract(parsed.concur) : [];
+    const prereqs = parsed.prereq ? extract(parsed.prereq, false, "") : [];
+    const concur = parsed.concur ? extract(parsed.concur, true, "") : [];
 
     return [...prereqs, ...concur];
   }),
