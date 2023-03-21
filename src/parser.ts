@@ -5,7 +5,6 @@ export type Course = {
   title: string;
   description: string;
 
-  __neighbours: Course[];
   __links: Link[];
 };
 
@@ -43,7 +42,7 @@ type Keyword = (typeof keywords)[number];
 const symbols = [",", ".", ":", ";", "(", ")"] as const;
 type Symbol = (typeof symbols)[number];
 
-type SubjectId = string;
+export type SubjectId = string;
 
 type Token =
   | { type: Operator }
@@ -470,7 +469,6 @@ export const constructGraph = (
     id: string;
     hover: string;
     group: string;
-    __neighbors: string[];
     __links: Link[];
   }[] = coursesParsed.map(({ course, parsed }) => {
     return {
@@ -483,7 +481,6 @@ export const constructGraph = (
       )}<br>Concur: ${prettyPrint(parsed.concur)}`,
       group: course.subjectId,
 
-      __neighbors: [],
       __links: [],
     };
   });

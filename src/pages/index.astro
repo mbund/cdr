@@ -11,20 +11,57 @@
       .force-graph-container .graph-tooltip {
         width: 60ch;
       }
+
+      body {
+        margin: 0;
+      }
+
+      #loading {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        margin: 0 2em;
+      }
+
+      #loading > div {
+        max-width: 70ch;
+        text-align: center;
+      }
+
+      .lds-dual-ring {
+        display: inline-block;
+        width: 80px;
+        height: 80px;
+      }
+      .lds-dual-ring:after {
+        content: " ";
+        display: block;
+        width: 64px;
+        height: 64px;
+        margin: 8px;
+        border-radius: 50%;
+        border: 6px solid #bbb;
+        border-color: #bbb transparent #bbb transparent;
+        animation: lds-dual-ring 1.2s linear infinite;
+      }
+      @keyframes lds-dual-ring {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
     </style>
 
     <div id="loading">
-      <div>Loading...</div>
-      <div style="margin-bottom: 1em;">
+      <div style="margin-bottom: 1em;" class="lds-dual-ring"></div>
+      <div style="margin-bottom: 2em; font-size: small; max-width: 30ch;">
         Your browser may warn you that this page is slowing down the browser.
       </div>
-      <div style="max-width: 100ch;">
-        Tip: add <code>?include=CSE,PHYSICS,MATH,STAT</code> in the URL bar to build
-        a graph out of classes only the CSE, Physics, Math, and Statistics departments.
-        Similarly, use
-        <code>?exclude=MUSIC</code> to build the full graph but without the Music
-        department.
-      </div>
+      <div id="tip"></div>
     </div>
 
     <div id="graph"></div>
@@ -34,6 +71,16 @@
       import ForceGraph from "force-graph";
       import { constructGraph, type Link, type Course } from "../parser";
       import { hashStr } from "../utils";
+      import MyWorker from "../graphconstructor?worker";
+
+      // loader
+      const tips = [
+        "Tip: add <code>?include=CSE,PHYSICS,MATH,STAT</code> in the URL bar to build a graph out of classes only the CSE, Physics, Math, and Statistics departments.",
+        "Tip: add <code>?exclude=MUSIC</code> in the URL bar to build the full graph but without the Music department.",
+        "Tip: add <code>?include=MATH,STAT,CHEM&exclude=CHEM</code> in the URL bar to build a graph out of classes only the Math and Statistics departments",
+      ];
+      const tipElement = document.getElementById("tip")!;
+      tipElement.innerHTML = tips[Math.floor(Math.random() * tips.length)];
 
       // input
 
@@ -87,90 +134,105 @@
 
       const dashLen = 2;
       const gapLen = 1;
-      const data = constructGraph(courses, subjectIds);
-      document.getElementById("loading")!.remove();
-      const graphElement = document.getElementById("graph")!;
-      ForceGraph()(graphElement)
-        .graphData(data)
-        .nodeId("id")
-        .nodeLabel("hover")
-        .linkSource("source")
-        .linkTarget("target")
-        .linkLineDash((link: any) => link.concurrent && [dashLen, gapLen])
-        .linkColor((link: any) =>
-          highlightLinks.has(link)
-            ? pallette[Math.abs(hashStr(link.group)) % pallette.length]
-            : "#77777777"
-        )
-        .linkDirectionalArrowLength((node: any) => (node.concurrent ? 0 : 3))
-        .linkWidth((link: any) => (highlightLinks.has(link) ? 2 : 1))
-        .linkDirectionalParticles(4)
-        .linkDirectionalParticleWidth((link: any) =>
-          highlightLinks.has(link) ? 4 : 0
-        )
-        .onNodeHover((node: any) => {
-          graphElement.style.cursor = node ? "pointer" : "";
 
-          highlightNodes.clear();
-          highlightLinks.clear();
-          if (node) {
-            highlightNodes.add(`${node.subjectId} ${node.callNumber}`);
-            node.__links.forEach((link: any) => {
+      type Graph = ReturnType<typeof constructGraph>;
+
+      const renderGraph = (graph: Graph) => {
+        document.getElementById("loading")!.remove();
+        const graphElement = document.getElementById("graph")!;
+        ForceGraph()(graphElement)
+          .graphData(graph)
+          .nodeId("id")
+          .nodeLabel("hover")
+          .linkSource("source")
+          .linkTarget("target")
+          .linkLineDash((link: any) => link.concurrent && [dashLen, gapLen])
+          .linkColor((link: any) =>
+            highlightLinks.has(link)
+              ? pallette[Math.abs(hashStr(link.group)) % pallette.length]
+              : "#77777777"
+          )
+          .linkDirectionalArrowLength((node: any) => (node.concurrent ? 0 : 3))
+          .linkWidth((link: any) => (highlightLinks.has(link) ? 2 : 1))
+          .linkDirectionalParticles(4)
+          .linkDirectionalParticleWidth((link: any) =>
+            highlightLinks.has(link) ? 4 : 0
+          )
+          .onNodeHover((node: any) => {
+            graphElement.style.cursor = node ? "pointer" : "";
+
+            highlightNodes.clear();
+            highlightLinks.clear();
+            if (node) {
+              highlightNodes.add(`${node.subjectId} ${node.callNumber}`);
+              node.__links.forEach((link: any) => {
+                highlightLinks.add(link);
+                highlightNodes.add(link.source);
+                highlightNodes.add(link.target);
+              });
+            }
+          })
+          .onLinkHover((link: any) => {
+            highlightNodes.clear();
+            highlightLinks.clear();
+
+            if (link) {
               highlightLinks.add(link);
               highlightNodes.add(link.source);
               highlightNodes.add(link.target);
-            });
-          }
-        })
-        .onLinkHover((link: any) => {
-          highlightNodes.clear();
-          highlightLinks.clear();
+            }
+          })
+          .autoPauseRedraw(false)
+          .linkDirectionalArrowRelPos(0.05)
+          .nodeCanvasObject((node: any, ctx) => {
+            const label = node.label;
+            const fontSize = 3;
+            ctx.font = `${fontSize}px Sans-Serif`;
+            const textWidth = ctx.measureText(label).width;
+            const bckgDimensions = [textWidth, fontSize].map(
+              (n) => n + fontSize * 0.2
+            );
 
-          if (link) {
-            highlightLinks.add(link);
-            highlightNodes.add(link.source);
-            highlightNodes.add(link.target);
-          }
-        })
-        .autoPauseRedraw(false)
-        .linkDirectionalArrowRelPos(0.05)
-        .nodeCanvasObject((node: any, ctx) => {
-          const label = node.label;
-          const fontSize = 3;
-          ctx.font = `${fontSize}px Sans-Serif`;
-          const textWidth = ctx.measureText(label).width;
-          const bckgDimensions = [textWidth, fontSize].map(
-            (n) => n + fontSize * 0.2
-          );
-
-          ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
-          ctx.fillRect(
-            node.x - bckgDimensions[0] / 2,
-            node.y - bckgDimensions[1] / 2,
-            bckgDimensions[0],
-            bckgDimensions[1]
-          );
-
-          const color =
-            pallette[Math.abs(hashStr(node.group)) % pallette.length];
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          ctx.fillStyle = color;
-          ctx.fillText(label, node.x, node.y);
-
-          node.__bckgDimensions = bckgDimensions;
-        })
-        .nodePointerAreaPaint((node: any, color, ctx) => {
-          ctx.fillStyle = color;
-          const bckgDimensions = node.__bckgDimensions;
-          bckgDimensions &&
+            ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
             ctx.fillRect(
               node.x - bckgDimensions[0] / 2,
               node.y - bckgDimensions[1] / 2,
               bckgDimensions[0],
               bckgDimensions[1]
             );
-        });
+
+            const color =
+              pallette[Math.abs(hashStr(node.group)) % pallette.length];
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillStyle = color;
+            ctx.fillText(label, node.x, node.y);
+
+            node.__bckgDimensions = bckgDimensions;
+          })
+          .nodePointerAreaPaint((node: any, color, ctx) => {
+            ctx.fillStyle = color;
+            const bckgDimensions = node.__bckgDimensions;
+            bckgDimensions &&
+              ctx.fillRect(
+                node.x - bckgDimensions[0] / 2,
+                node.y - bckgDimensions[1] / 2,
+                bckgDimensions[0],
+                bckgDimensions[1]
+              );
+          });
+      };
+
+      if (window.Worker) {
+        // const worker = new Worker("src/worker.js", { type: "module" });
+        const worker = new MyWorker();
+        worker.postMessage({ courses, subjectIds });
+        worker.onmessage = (e: MessageEvent<Graph>) => {
+          renderGraph(e.data);
+        };
+      } else {
+        renderGraph(constructGraph(courses, subjectIds));
+      }
     </script>
   </body>
 </html>
