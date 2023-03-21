@@ -14,7 +14,10 @@
     </style>
 
     <div id="loading">
-      <div style="margin-bottom: 1em;">Loading...</div>
+      <div>Loading...</div>
+      <div style="margin-bottom: 1em;">
+        Your browser may warn you that this page is slowing down the browser.
+      </div>
       <div style="max-width: 100ch;">
         Tip: add <code>?include=CSE,PHYSICS,MATH,STAT</code> in the URL bar to build
         a graph out of classes only the CSE, Physics, Math, and Statistics departments.
@@ -30,6 +33,9 @@
       // force-graph types are not great (javascript library) so there are a lot of anys :(
       import ForceGraph from "force-graph";
       import { constructGraph, type Course } from "../parser";
+      import { hashStr } from "../utils";
+
+      // input
 
       const params = new URLSearchParams(document.location.search);
       const includedSubjectIdsParams = params.get("include");
@@ -45,6 +51,8 @@
             .map((subjectId) => subjectId.toUpperCase())
         : [];
 
+      // parsing
+
       const courses = await fetch("courses.json")
         .then((res) => res.json())
         .then((courses: Course[]) => courses);
@@ -58,6 +66,22 @@
               .map((course) => course.subjectId)
               .filter((subjectId) => !excludedSubjectIds.includes(subjectId));
 
+      // visualizing
+
+      const pallette = [
+        "#a6cee3",
+        "#1f78b4",
+        "#b2df8a",
+        "#33a02c",
+        "#fb9a99",
+        "#e31a1c",
+        "#fdbf6f",
+        "#ff7f00",
+        "#cab2d6",
+        "#6a3d9a",
+        "#b15928",
+      ];
+
       const dashLen = 2;
       const gapLen = 1;
       const data = constructGraph(courses, subjectIds);
@@ -67,11 +91,15 @@
         .graphData(data)
         .nodeId("id")
         .nodeLabel("hover")
-        .nodeAutoColorBy("group")
         .linkSource("source")
         .linkTarget("target")
-        .linkLineDash((link) => (link as any).concurrent && [dashLen, gapLen])
-        .linkAutoColorBy("group")
+        .linkLineDash((link: any) => link.concurrent && [dashLen, gapLen])
+        .linkColor((link: any) => {
+          const color =
+            pallette[Math.abs(hashStr(link.group)) % pallette.length];
+          link.color = color;
+          return color;
+        })
         .linkDirectionalArrowLength((node: any) => (node.concurrent ? 0 : 3))
         .linkDirectionalParticles(2)
         .onNodeHover((node: any) => {
@@ -95,9 +123,11 @@
             bckgDimensions[1]
           );
 
+          const color =
+            pallette[Math.abs(hashStr(node.group)) % pallette.length];
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
-          ctx.fillStyle = node.color;
+          ctx.fillStyle = color;
           ctx.fillText(label, node.x, node.y);
 
           node.__bckgDimensions = bckgDimensions;
