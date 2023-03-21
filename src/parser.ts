@@ -1,9 +1,13 @@
-import courses from "./data/courses.json";
+export type Course = {
+  subjectId: string;
+  subjectLong: string;
+  callNumber: string;
+  title: string;
+  description: string;
+};
 
 const operators = ["and", "or"] as const;
 type Operator = (typeof operators)[number];
-
-type SubjectId = string;
 
 type Literal = { type: "literal"; subjectId: SubjectId; callNumber: string };
 
@@ -36,7 +40,7 @@ type Keyword = (typeof keywords)[number];
 const symbols = [",", ".", ":", ";", "(", ")"] as const;
 type Symbol = (typeof symbols)[number];
 
-const subjectIds = courses.map((course) => course.subjectId.toLowerCase());
+type SubjectId = string;
 
 type Token =
   | { type: Operator }
@@ -50,21 +54,22 @@ type Token =
 type TokenType = Token["type"];
 
 const tokenizeSingle = (
-  description: string
+  text: string,
+  subjectIds: SubjectId[]
 ): { token: Token; remainder: string } => {
-  const ws = description.match(/^\s+/);
+  const ws = text.match(/^\s+/);
   if (ws) {
-    description = description.substring(ws[0].length);
+    text = text.substring(ws[0].length);
   }
 
-  const wordMatch = description.match(/^[a-z]+/);
+  const wordMatch = text.match(/^[a-z]+/);
   if (wordMatch) {
     const word = wordMatch[0];
     for (const keyword of [...keywords]) {
       if (word === keyword) {
         return {
           token: { type: keyword },
-          remainder: description.substring(keyword.length),
+          remainder: text.substring(keyword.length),
         };
       }
     }
@@ -73,45 +78,45 @@ const tokenizeSingle = (
       if (word === subjectId) {
         return {
           token: { type: "subjectId", value: subjectId },
-          remainder: description.substring(subjectId.length),
+          remainder: text.substring(subjectId.length),
         };
       }
     }
   }
 
   for (const symbol of symbols) {
-    if (description.startsWith(symbol)) {
+    if (text.startsWith(symbol)) {
       return {
         token: { type: symbol },
-        remainder: description.substring(symbol.length),
+        remainder: text.substring(symbol.length),
       };
     }
   }
 
-  const callNumMatch = description.match(/^\d{3,4}(\.((\d+)|(xx)))?h?/i);
+  const callNumMatch = text.match(/^\d{3,4}(\.((\d+)|(xx)))?h?/i);
   if (callNumMatch) {
     const callNum = callNumMatch[0];
     return {
       token: { type: "callNumber", value: callNum },
-      remainder: description.substring(callNum.length),
+      remainder: text.substring(callNum.length),
     };
   }
 
   return {
-    token: { type: "error", message: description[0] },
-    remainder: description.substring(1),
+    token: { type: "error", message: text[0] },
+    remainder: text.substring(1),
   };
 };
 
-const tokenize = (description: string): Token[] => {
-  description = description.toLowerCase();
+const tokenize = (text: string, subjectIds: SubjectId[]): Token[] => {
+  text = text.toLowerCase();
 
   let tokens: Token[] = [];
   while (true) {
-    const { token, remainder } = tokenizeSingle(description);
+    const { token, remainder } = tokenizeSingle(text, subjectIds);
     tokens.push(token);
-    description = remainder;
-    if (description.length === 0) break;
+    text = remainder;
+    if (text.length === 0) break;
   }
 
   return tokens;
@@ -364,8 +369,15 @@ class Parser {
   }
 }
 
-const parse = (description: string, topLevelSubjectId: SubjectId) => {
-  const tokens = tokenize(description);
+const parse = (
+  text: string,
+  topLevelSubjectId: SubjectId,
+  subjectIds: SubjectId[]
+) => {
+  const tokens = tokenize(
+    text,
+    subjectIds.map((subjectId) => subjectId.toLowerCase())
+  );
   const parser = new Parser(tokens, topLevelSubjectId);
   return parser.start();
 };
@@ -377,12 +389,12 @@ const unreachable = (): never => {
 const parseCallNumber = (
   callNumber: string
 ): {
-  baseCallNumber: string;
+  base: string;
   honors: boolean;
   section: string | null;
 } | null => {
-  const baseCallNumber = callNumber.match(/^\d{3,4}/i)?.[0];
-  if (!baseCallNumber) return null;
+  const base = callNumber.match(/^\d{3,4}/i)?.[0];
+  if (!base) return null;
 
   const honors =
     callNumber.toLowerCase().includes("h") ||
@@ -397,7 +409,7 @@ const parseCallNumber = (
   }
 
   return {
-    baseCallNumber,
+    base: base,
     honors,
     section,
   };
@@ -426,27 +438,6 @@ const prettyPrint = (expression: Expression | null): string => {
   return unreachable();
 };
 
-const coursesFiltered = courses.filter(
-  (course) => true
-  // course.subjectId !== "MUSIC"
-  // ["HISTORY", "ENGLISH", "KOREAN"].includes(course.subjectId)
-);
-
-const nodes = coursesFiltered.map((course) => {
-  const parsed = parse(course.description, course.subjectId);
-
-  return {
-    label: `${course.subjectId} ${course.callNumber}`,
-    id: `${course.subjectId} ${course.callNumber}`,
-    hover: `${course.subjectId} ${course.callNumber}<br>${
-      course.title
-    }<br><br>${course.description}<br><br>Prereqs: ${prettyPrint(
-      parsed.prereq
-    )}<br>Concur: ${prettyPrint(parsed.concur)}`,
-    group: course.subjectId,
-  };
-});
-
 type Link = {
   source: string;
   target: string;
@@ -454,11 +445,38 @@ type Link = {
   group: string;
 };
 
-const graph = {
-  nodes: nodes,
-  links: coursesFiltered.flatMap((course) => {
-    console.log(`${course.subjectId} ${course.callNumber}`);
-    const parsed = parse(course.description, course.subjectId);
+export const constructGraph = (
+  courses: Course[],
+  includedSubjectIds: SubjectId[]
+) => {
+  const coursesFiltered = courses.filter((course) =>
+    includedSubjectIds.includes(course.subjectId)
+  );
+
+  const allSubjectIds = courses.map((course) => course.subjectId);
+
+  const coursesParsed = coursesFiltered.map((course) => {
+    return {
+      course: course,
+      parsed: parse(course.description, course.subjectId, allSubjectIds),
+    };
+  });
+
+  const nodes = coursesParsed.map(({ course, parsed }) => {
+    return {
+      label: `${course.subjectId} ${course.callNumber}`,
+      id: `${course.subjectId} ${course.callNumber}`,
+      hover: `${course.subjectId} ${course.callNumber}<br>${
+        course.title
+      }<br><br>${course.description}<br><br>Prereqs: ${prettyPrint(
+        parsed.prereq
+      )}<br>Concur: ${prettyPrint(parsed.concur)}`,
+      group: course.subjectId,
+    };
+  });
+
+  const links = coursesParsed.flatMap(({ course, parsed }) => {
+    // console.log(`${course.subjectId} ${course.callNumber}`);
 
     const extract = (
       expression: Expression,
@@ -476,22 +494,15 @@ const graph = {
 
           if (targetCallNumber.honors !== sourceCallNumber.honors) return false;
 
-          if (
-            targetCallNumber.baseCallNumber !== sourceCallNumber.baseCallNumber
-          )
-            return false;
+          if (targetCallNumber.base !== sourceCallNumber.base) return false;
 
           if (targetCallNumber.section && sourceCallNumber.section)
             return targetCallNumber.section === sourceCallNumber.section;
 
-          if (!targetCallNumber.section || targetCallNumber.section === "XX") {
-            return (
-              targetCallNumber.baseCallNumber ===
-              sourceCallNumber.baseCallNumber
-            );
-          }
+          if (!targetCallNumber.section || targetCallNumber.section === "XX")
+            return targetCallNumber.base === sourceCallNumber.base;
 
-          return false;
+          // return false;
         });
 
         return targetCourses.flatMap((c) => [
@@ -517,7 +528,7 @@ const graph = {
     const concur = parsed.concur ? extract(parsed.concur, true, "") : [];
 
     return [...prereqs, ...concur];
-  }),
-};
+  });
 
-await Bun.write("public/courses.json", JSON.stringify(graph));
+  return { nodes: nodes, links: links };
+};

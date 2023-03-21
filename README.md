@@ -1,5 +1,18 @@
 OSU course dependency visualizer
 
+Visit https://mbund.github.io/cdr/ to view the dependency graph of every class offered at OSU. It might take ~30 seconds to build the full graph.
+
+Filter the graph with comma separated query parameters specifying subject IDs:
+
+- All classes except those in the Music department
+  - https://mbund.github.io/cdr/?exclude=MUSIC
+- All classes except those in the English, Biology, and Psychology departments
+  - https://mbund.github.io/cdr/?exclude=ENGLISH,BIOLOGY,PSYCH
+- Only classes in the Math department
+  - https://mbund.github.io/cdr/?include=MATH
+- Only classes in the CSE, Math, Physics and Statistics departments
+  - https://mbund.github.io/cdr/?include=CSE,PHYSICS,MATH,STAT
+
 ### Running
 
 ```

@@ -13,75 +13,105 @@
       }
     </style>
 
+    <div id="loading">
+      <div style="margin-bottom: 1em;">Loading...</div>
+      <div style="max-width: 100ch;">
+        Tip: add <code>?include=CSE,PHYSICS,MATH,STAT</code> in the URL bar to build
+        a graph out of classes only the CSE, Physics, Math, and Statistics departments.
+        Similarly, use
+        <code>?exclude=MUSIC</code> to build the full graph but without the Music
+        department.
+      </div>
+    </div>
+
     <div id="graph"></div>
 
     <script>
       // force-graph types are not great (javascript library) so there are a lot of anys :(
       import ForceGraph from "force-graph";
+      import { constructGraph, type Course } from "../parser";
+
+      const params = new URLSearchParams(document.location.search);
+      const includedSubjectIdsParams = params.get("include");
+      const includedSubjectIds = includedSubjectIdsParams
+        ? includedSubjectIdsParams
+            .split(",")
+            .map((subjectId) => subjectId.toUpperCase())
+        : [];
+      const excludedSubjectIdsParams = params.get("exclude");
+      const excludedSubjectIds = excludedSubjectIdsParams
+        ? excludedSubjectIdsParams
+            .split(",")
+            .map((subjectId) => subjectId.toUpperCase())
+        : [];
+
+      const courses = await fetch("courses.json")
+        .then((res) => res.json())
+        .then((courses: Course[]) => courses);
+
+      const subjectIds =
+        includedSubjectIds.length > 0
+          ? includedSubjectIds.filter(
+              (subjectId) => !excludedSubjectIds.includes(subjectId)
+            )
+          : courses
+              .map((course) => course.subjectId)
+              .filter((subjectId) => !excludedSubjectIds.includes(subjectId));
 
       const dashLen = 2;
       const gapLen = 1;
+      const data = constructGraph(courses, subjectIds);
+      document.getElementById("loading")!.remove();
+      const graphElement = document.getElementById("graph")!;
+      ForceGraph()(graphElement)
+        .graphData(data)
+        .nodeId("id")
+        .nodeLabel("hover")
+        .nodeAutoColorBy("group")
+        .linkSource("source")
+        .linkTarget("target")
+        .linkLineDash((link) => (link as any).concurrent && [dashLen, gapLen])
+        .linkAutoColorBy("group")
+        .linkDirectionalArrowLength((node: any) => (node.concurrent ? 0 : 3))
+        .linkDirectionalParticles(2)
+        .onNodeHover((node: any) => {
+          graphElement.style.cursor = node ? "pointer" : "";
+        })
+        .linkDirectionalArrowRelPos(0.05)
+        .nodeCanvasObject((node: any, ctx) => {
+          const label = node.label;
+          const fontSize = 3;
+          ctx.font = `${fontSize}px Sans-Serif`;
+          const textWidth = ctx.measureText(label).width;
+          const bckgDimensions = [textWidth, fontSize].map(
+            (n) => n + fontSize * 0.2
+          );
 
-      fetch("courses.json")
-        .then((res) => res.json())
-        .then((data) => {
-          const graphElement = document.getElementById("graph");
-          if (!graphElement) throw new Error("No graph element found");
+          ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+          ctx.fillRect(
+            node.x - bckgDimensions[0] / 2,
+            node.y - bckgDimensions[1] / 2,
+            bckgDimensions[0],
+            bckgDimensions[1]
+          );
 
-          ForceGraph()(graphElement)
-            .graphData(data)
-            .nodeId("id")
-            .nodeLabel("hover")
-            .nodeAutoColorBy("group")
-            .linkSource("source")
-            .linkTarget("target")
-            .linkLineDash(
-              (link) => (link as any).concurrent && [dashLen, gapLen]
-            )
-            .linkAutoColorBy("group")
-            .linkDirectionalArrowLength((node: any) =>
-              node.concurrent ? 0 : 3
-            )
-            .linkDirectionalParticles(2)
-            .onNodeHover((node: any) => {
-              graphElement.style.cursor = node ? "pointer" : "";
-            })
-            .linkDirectionalArrowRelPos(0.05)
-            .nodeCanvasObject((node: any, ctx) => {
-              const label = node.label;
-              const fontSize = 3;
-              ctx.font = `${fontSize}px Sans-Serif`;
-              const textWidth = ctx.measureText(label).width;
-              const bckgDimensions = [textWidth, fontSize].map(
-                (n) => n + fontSize * 0.2
-              );
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillStyle = node.color;
+          ctx.fillText(label, node.x, node.y);
 
-              ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
-              ctx.fillRect(
-                node.x - bckgDimensions[0] / 2,
-                node.y - bckgDimensions[1] / 2,
-                bckgDimensions[0],
-                bckgDimensions[1]
-              );
-
-              ctx.textAlign = "center";
-              ctx.textBaseline = "middle";
-              ctx.fillStyle = node.color;
-              ctx.fillText(label, node.x, node.y);
-
-              node.__bckgDimensions = bckgDimensions;
-            })
-            .nodePointerAreaPaint((node: any, color, ctx) => {
-              ctx.fillStyle = color;
-              const bckgDimensions = node.__bckgDimensions;
-              bckgDimensions &&
-                ctx.fillRect(
-                  node.x - bckgDimensions[0] / 2,
-                  node.y - bckgDimensions[1] / 2,
-                  bckgDimensions[0],
-                  bckgDimensions[1]
-                );
-            });
+          node.__bckgDimensions = bckgDimensions;
+        })
+        .nodePointerAreaPaint((node: any, color, ctx) => {
+          ctx.fillStyle = color;
+          const bckgDimensions = node.__bckgDimensions;
+          bckgDimensions &&
+            ctx.fillRect(
+              node.x - bckgDimensions[0] / 2,
+              node.y - bckgDimensions[1] / 2,
+              bckgDimensions[0],
+              bckgDimensions[1]
+            );
         });
     </script>
   </body>
