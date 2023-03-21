@@ -1,4 +1,4 @@
-OSU course dependency visualizer
+## OSU course dependency visualizer
 
 Visit https://mbund.github.io/cdr/ to view the dependency graph of every class offered at OSU. It might take ~30 seconds to build the full graph.
 
