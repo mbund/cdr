@@ -4,6 +4,9 @@ export type Course = {
   callNumber: string;
   title: string;
   description: string;
+
+  __neighbours: Course[];
+  __links: Link[];
 };
 
 const operators = ["and", "or"] as const;
@@ -438,7 +441,7 @@ const prettyPrint = (expression: Expression | null): string => {
   return unreachable();
 };
 
-type Link = {
+export type Link = {
   source: string;
   target: string;
   concurrent: boolean;
@@ -462,7 +465,14 @@ export const constructGraph = (
     };
   });
 
-  const nodes = coursesParsed.map(({ course, parsed }) => {
+  let nodes: {
+    label: string;
+    id: string;
+    hover: string;
+    group: string;
+    __neighbors: string[];
+    __links: Link[];
+  }[] = coursesParsed.map(({ course, parsed }) => {
     return {
       label: `${course.subjectId} ${course.callNumber}`,
       id: `${course.subjectId} ${course.callNumber}`,
@@ -472,6 +482,9 @@ export const constructGraph = (
         parsed.prereq
       )}<br>Concur: ${prettyPrint(parsed.concur)}`,
       group: course.subjectId,
+
+      __neighbors: [],
+      __links: [],
     };
   });
 
@@ -502,7 +515,7 @@ export const constructGraph = (
           if (!targetCallNumber.section || targetCallNumber.section === "XX")
             return targetCallNumber.base === sourceCallNumber.base;
 
-          // return false;
+          return false;
         });
 
         return targetCourses.flatMap((c) => [
@@ -528,6 +541,13 @@ export const constructGraph = (
     const concur = parsed.concur ? extract(parsed.concur, true, "") : [];
 
     return [...prereqs, ...concur];
+  });
+
+  nodes = nodes.map((node) => {
+    node.__links = links.filter(
+      (link) => link.source === node.id || link.target == node.id
+    );
+    return node;
   });
 
   return { nodes: nodes, links: links };

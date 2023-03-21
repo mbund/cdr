@@ -32,7 +32,7 @@
     <script>
       // force-graph types are not great (javascript library) so there are a lot of anys :(
       import ForceGraph from "force-graph";
-      import { constructGraph, type Course } from "../parser";
+      import { constructGraph, type Link, type Course } from "../parser";
       import { hashStr } from "../utils";
 
       // input
@@ -82,6 +82,9 @@
         "#b15928",
       ];
 
+      const highlightLinks = new Set<Link>();
+      const highlightNodes = new Set<string>();
+
       const dashLen = 2;
       const gapLen = 1;
       const data = constructGraph(courses, subjectIds);
@@ -94,17 +97,42 @@
         .linkSource("source")
         .linkTarget("target")
         .linkLineDash((link: any) => link.concurrent && [dashLen, gapLen])
-        .linkColor((link: any) => {
-          const color =
-            pallette[Math.abs(hashStr(link.group)) % pallette.length];
-          link.color = color;
-          return color;
-        })
+        .linkColor((link: any) =>
+          highlightLinks.has(link)
+            ? pallette[Math.abs(hashStr(link.group)) % pallette.length]
+            : "#77777777"
+        )
         .linkDirectionalArrowLength((node: any) => (node.concurrent ? 0 : 3))
-        .linkDirectionalParticles(2)
+        .linkWidth((link: any) => (highlightLinks.has(link) ? 2 : 1))
+        .linkDirectionalParticles(4)
+        .linkDirectionalParticleWidth((link: any) =>
+          highlightLinks.has(link) ? 4 : 0
+        )
         .onNodeHover((node: any) => {
           graphElement.style.cursor = node ? "pointer" : "";
+
+          highlightNodes.clear();
+          highlightLinks.clear();
+          if (node) {
+            highlightNodes.add(`${node.subjectId} ${node.callNumber}`);
+            node.__links.forEach((link: any) => {
+              highlightLinks.add(link);
+              highlightNodes.add(link.source);
+              highlightNodes.add(link.target);
+            });
+          }
         })
+        .onLinkHover((link: any) => {
+          highlightNodes.clear();
+          highlightLinks.clear();
+
+          if (link) {
+            highlightLinks.add(link);
+            highlightNodes.add(link.source);
+            highlightNodes.add(link.target);
+          }
+        })
+        .autoPauseRedraw(false)
         .linkDirectionalArrowRelPos(0.05)
         .nodeCanvasObject((node: any, ctx) => {
           const label = node.label;
