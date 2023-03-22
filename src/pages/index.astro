@@ -69,9 +69,8 @@
     <script>
       // force-graph types are not great (javascript library) so there are a lot of anys :(
       import ForceGraph from "force-graph";
-      import { constructGraph, type Link, type Course } from "../parser";
+      import type { constructGraph, Link, Course } from "../parser";
       import { hashStr } from "../utils";
-      import MyWorker from "../graphconstructor?worker";
 
       // loader
       const tips = [
@@ -104,6 +103,8 @@
         .then((res) => res.json())
         .then((courses: Course[]) => courses);
 
+      type Graph = ReturnType<typeof constructGraph>;
+
       const subjectIds =
         includedSubjectIds.length > 0
           ? includedSubjectIds.filter(
@@ -112,6 +113,30 @@
           : courses
               .map((course) => course.subjectId)
               .filter((subjectId) => !excludedSubjectIds.includes(subjectId));
+
+      const coursesGraph = await fetch("courses-graph.json")
+        .then((res) => res.json())
+        .then((graph: Graph) => {
+          return {
+            nodes: graph.nodes
+              .filter((node) => subjectIds.includes(node.label.split(" ")[0]))
+              .map((node) => {
+                return {
+                  ...node,
+                  __links: node.__links.filter(
+                    (link) =>
+                      subjectIds.includes(link.source.split(" ")[0]) &&
+                      subjectIds.includes(link.target.split(" ")[0])
+                  ),
+                };
+              }),
+            links: graph.links.filter(
+              (link) =>
+                subjectIds.includes(link.source.split(" ")[0]) &&
+                subjectIds.includes(link.target.split(" ")[0])
+            ),
+          };
+        });
 
       // visualizing
 
@@ -129,58 +154,71 @@
         "#b15928",
       ];
 
-      const highlightLinks = new Set<Link>();
-      const highlightNodes = new Set<string>();
+      let highlightLinks: Link[] = [];
 
       const dashLen = 2;
       const gapLen = 1;
 
-      type Graph = ReturnType<typeof constructGraph>;
-
       const renderGraph = (graph: Graph) => {
         document.getElementById("loading")!.remove();
         const graphElement = document.getElementById("graph")!;
-        ForceGraph()(graphElement)
+        const g = ForceGraph()(graphElement)
           .graphData(graph)
           .nodeId("id")
           .nodeLabel("hover")
           .linkSource("source")
           .linkTarget("target")
           .linkLineDash((link: any) => link.concurrent && [dashLen, gapLen])
-          .linkColor((link: any) =>
-            highlightLinks.has(link)
+          .linkColor((link: any) => {
+            return highlightLinks.some(
+              (l) =>
+                l.source === link.source.id &&
+                l.target === link.target.id &&
+                l.group === link.group &&
+                l.concurrent === link.concurrent
+            )
               ? pallette[Math.abs(hashStr(link.group)) % pallette.length]
-              : "#77777777"
-          )
+              : "#77777777";
+          })
           .linkDirectionalArrowLength((node: any) => (node.concurrent ? 0 : 3))
-          .linkWidth((link: any) => (highlightLinks.has(link) ? 2 : 1))
+          .linkWidth((link: any) =>
+            highlightLinks.some(
+              (l) =>
+                l.source === link.source.id &&
+                l.target === link.target.id &&
+                l.group === link.group &&
+                l.concurrent === link.concurrent
+            )
+              ? 2
+              : 1
+          )
           .linkDirectionalParticles(4)
           .linkDirectionalParticleWidth((link: any) =>
-            highlightLinks.has(link) ? 4 : 0
+            highlightLinks.some(
+              (l) =>
+                l.source === link.source.id &&
+                l.target === link.target.id &&
+                l.group === link.group &&
+                l.concurrent === link.concurrent
+            )
+              ? 4
+              : 0
           )
           .onNodeHover((node: any) => {
             graphElement.style.cursor = node ? "pointer" : "";
-
-            highlightNodes.clear();
-            highlightLinks.clear();
-            if (node) {
-              highlightNodes.add(`${node.subjectId} ${node.callNumber}`);
-              node.__links.forEach((link: any) => {
-                highlightLinks.add(link);
-                highlightNodes.add(link.source);
-                highlightNodes.add(link.target);
-              });
-            }
+            highlightLinks = node ? node.__links : [];
           })
           .onLinkHover((link: any) => {
-            highlightNodes.clear();
-            highlightLinks.clear();
-
-            if (link) {
-              highlightLinks.add(link);
-              highlightNodes.add(link.source);
-              highlightNodes.add(link.target);
-            }
+            highlightLinks = link
+              ? [
+                  {
+                    source: link.source.id,
+                    target: link.target.id,
+                    group: link.group,
+                    concurrent: link.concurrent,
+                  },
+                ]
+              : [];
           })
           .autoPauseRedraw(false)
           .linkDirectionalArrowRelPos(0.05)
@@ -223,16 +261,7 @@
           });
       };
 
-      if (window.Worker) {
-        // const worker = new Worker("src/worker.js", { type: "module" });
-        const worker = new MyWorker();
-        worker.postMessage({ courses, subjectIds });
-        worker.onmessage = (e: MessageEvent<Graph>) => {
-          renderGraph(e.data);
-        };
-      } else {
-        renderGraph(constructGraph(courses, subjectIds));
-      }
+      renderGraph(coursesGraph);
     </script>
   </body>
 </html>

@@ -388,7 +388,7 @@ const unreachable = (): never => {
   throw "Unreachable!";
 };
 
-const parseCallNumber = (
+export const parseCallNumber = (
   callNumber: string
 ): {
   base: string;
