@@ -54,6 +54,15 @@
           transform: rotate(360deg);
         }
       }
+
+      #github {
+        position: fixed;
+        bottom: 1em;
+        right: 1em;
+      }
+      #github > img:hover {
+        opacity: 90%;
+      }
     </style>
 
     <div id="loading">
@@ -65,6 +74,10 @@
     </div>
 
     <div id="graph"></div>
+
+    <a id="github" href="https://github.com/mbund/cdr">
+      <img width="50" src="/public/github-mark.svg" />
+    </a>
 
     <script>
       // force-graph types are not great (javascript library) so there are a lot of anys :(
