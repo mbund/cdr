@@ -68,6 +68,18 @@
       #github > img:hover {
         opacity: 90%;
       }
+
+      nav {
+        position: absolute;
+        top: 1ch;
+        left: 1ch;
+        display: flex;
+        gap: 2ch;
+      }
+
+      a {
+        color: black;
+      }
     </style>
 
     <div id="loading">
@@ -80,8 +92,16 @@
 
     <div id="graph"></div>
 
+    <nav>
+      <a href="/"><code>all</code></a>
+      <a href="?include=CSE,PHYSICS,MATH,STAT"
+        ><code>?include=CSE,PHYSICS,MATH,STAT</code></a
+      >
+      <a href="?exclude=MUSIC"><code>?exclude=MUSIC</code></a>
+    </nav>
+
     <a id="github" href="https://github.com/mbund/cdr">
-      <img width="50" src="/github-mark.svg" />
+      <img alt="GitHub project link" width="50" src="/github-mark.svg" />
     </a>
 
     <script>
